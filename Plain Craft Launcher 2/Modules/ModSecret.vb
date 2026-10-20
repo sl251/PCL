@@ -67,8 +67,63 @@ Friend Module ModSecret
 
     Public Sub ThemeRefresh(Optional NewTheme As Integer = -1)
         Try
-            If ThemeNow = NewTheme AndAlso NewTheme >= 0 Then Return
+            If NewTheme < -1 OrElse NewTheme > 14 Then Return
             If NewTheme >= 0 Then ThemeNow = NewTheme
+
+            ColorHue = 210
+            ColorSat = 85
+            ColorLightAdjust = 0
+            ColorHueTopbarDelta = 0
+            Select Case ThemeNow
+                Case 1
+                    ColorHue = 160
+                    ColorSat = 78
+                Case 2
+                    ColorHue = 120
+                    ColorSat = 72
+                Case 3
+                    ColorHue = 50
+                    ColorSat = 88
+                    ColorLightAdjust = 2
+                Case 4
+                    ColorHue = 28
+                    ColorSat = 55
+                Case 5
+                    ColorSat = 0
+                    ColorLightAdjust = -12
+                Case 6
+                    ColorHue = 330
+                    ColorSat = 78
+                Case 7
+                    ColorHue = 275
+                    ColorSat = 65
+                Case 8
+                    ColorHue = 42
+                    ColorSat = 92
+                    ColorLightAdjust = 5
+                Case 9
+                    ColorHue = 25
+                    ColorSat = 92
+                Case 10
+                    ColorHue = 0
+                    ColorSat = 82
+                Case 11
+                    ColorHue = 195
+                    ColorSat = 88
+                Case 12
+                    '首次选择从红色开始；定时刷新时使用无符号计时，避免 TickCount 变负。
+                    ColorHue = If(NewTheme = 12, 0, CInt(((CLng(Environment.TickCount) And &HFFFFFFFFL) \ 50) Mod 360))
+                Case 13
+                    ColorHue = 55
+                    ColorSat = 95
+                    ColorLightAdjust = 8
+                    ColorHueTopbarDelta = New Integer() {5, 0, -5}
+                Case 14
+                    ColorHue = Settings.Get(Of Integer)("UiLauncherHue")
+                    ColorSat = Settings.Get(Of Integer)("UiLauncherSat")
+                    ColorLightAdjust = Settings.Get(Of Integer)("UiLauncherLight") - 20
+                    ColorHueTopbarDelta = Settings.Get(Of Integer)("UiLauncherDelta") - 90
+            End Select
 
             Color1 = New MyColor().FromHSL2(ColorHue, ColorSat * 0.2, 25 + ColorLightAdjust * 0.3)
             Color2 = New MyColor().FromHSL2(ColorHue, ColorSat, 45 + ColorLightAdjust)
@@ -132,13 +187,51 @@ Friend Module ModSecret
             FrmMain.PanForm.Background.Freeze()
         End Sub)
     End Sub
+
     Friend Sub ThemeCheckAll(EffectSetup As Boolean)
+        RunInUi(
+        Sub()
+            If FrmSetupUI Is Nothing OrElse FrmSetupUI.PanLauncherTheme Is Nothing Then Return
+            For Each Radio As MyRadioBox In FrmSetupUI.PanLauncherTheme.Children.OfType(Of MyRadioBox)()
+                Const Prefix As String = "RadioLauncherTheme"
+                Dim Id As Integer
+                If Radio.Name.StartsWith(Prefix, StringComparison.Ordinal) AndAlso
+                   Integer.TryParse(Radio.Name.Substring(Prefix.Length), Id) Then
+                    Radio.IsEnabled = True
+                End If
+            Next
+            '玄素黑：去掉灰色覆膜，展示真实黑色主题。
+            FrmSetupUI.RadioLauncherTheme5.Opacity = 1
+            FrmSetupUI.RadioLauncherTheme5Gray.Visibility = Visibility.Collapsed
+            FrmSetupUI.LabLauncherTheme5Unlock.Visibility = Visibility.Collapsed
+            '移除隐藏主题上的点击覆盖层，所有主题均可直接选择。
+            FrmSetupUI.LabLauncherTheme8Copy.Visibility = Visibility.Collapsed
+            FrmSetupUI.LabLauncherTheme9Copy.Visibility = Visibility.Collapsed
+            FrmSetupUI.LabLauncherTheme11Click.Visibility = Visibility.Collapsed
+            If EffectSetup Then
+                'Loaded 中仍会显示正式版的赞助遮罩，待该事件执行完毕后再移除。
+                RunInUi(Sub() FrmSetupUI.PanLauncherHide.Visibility = Visibility.Collapsed, ForceWaitUntilLoaded:=True)
+            End If
+        End Sub)
     End Sub
+    ''' <summary>
+    ''' 本 fork 中所有主题直接开放，不再校验解锁状态。
+    ''' </summary>
     Friend Function ThemeCheckOne(Id As Integer) As Boolean
         Return True
     End Function
+    Private ReadOnly ThemeUnlockAnnounced As New HashSet(Of Integer)
     Friend Function ThemeUnlock(Id As Integer, Optional ShowDoubleHint As Boolean = True, Optional UnlockHint As String = Nothing) As Boolean
-        Return False
+        '所有主题已直接开放，无需解锁流程；保留签名以兼容彩蛋调用点，每个会话仅提示一次。
+        SyncLock ThemeUnlockAnnounced
+            If ThemeUnlockAnnounced.Contains(Id) Then Return False
+            ThemeUnlockAnnounced.Add(Id)
+        End SyncLock
+        ThemeCheckAll(False)
+        If ShowDoubleHint Then
+            RunInUi(Sub() MyMsgBox(If(UnlockHint, "隐藏主题已解锁！"), "提示"))
+        End If
+        Return True
     End Function
 
 #End Region
@@ -182,20 +275,43 @@ Friend Module ModSecret
 
     Public ReadOnly Property CurrentRank As DonationRank
         Get
+            '本 fork 不接入赞助等级体系。
             Return DonationRank.None
         End Get
     End Property
 
     Public Sub InputPotatoCode(IsUpdating As Boolean)
+        '本 fork 已直接开放全部主题，不再需要解锁码。
+        If Not IsUpdating Then Hint("本 fork 已开放全部主题，无需解锁码～")
     End Sub
     Friend Sub GeneratePotatoCode()
+        Hint("本 fork 已开放全部主题，无需土豆码～")
     End Sub
+
+    '统一截取 SHA256 的前 8 字节，按四段大写十六进制输出。
+    Private Function GetLocalCode(Value As String) As String
+        Using Hasher = System.Security.Cryptography.SHA256.Create()
+            Dim Hex = BitConverter.ToString(Hasher.ComputeHash(Encoding.UTF8.GetBytes(Value)), 0, 8).Replace("-", "")
+            Return $"{Hex.Substring(0, 4)}-{Hex.Substring(4, 4)}-{Hex.Substring(8, 4)}-{Hex.Substring(12, 4)}"
+        End Using
+    End Function
+
+    Private CachedIdentify As String = Nothing
 
     ''' <summary>
     ''' 获取设备识别码。
     ''' </summary>
     Friend Function GetIdentify() As String
-        Return "0000-0000-0000-0000"
+        If CachedIdentify IsNot Nothing Then Return CachedIdentify
+        Dim MachineId As String = Nothing
+        Try
+            MachineId = CStr(RegistryUtils.TryRead("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography", "MachineGuid", ""))
+        Catch ex As Exception
+            Logger.Warn(ex, "读取设备 MachineGuid 失败，使用计算机名和用户名生成识别码")
+        End Try
+        If String.IsNullOrWhiteSpace(MachineId) Then MachineId = Environment.MachineName & "\" & Environment.UserName
+        CachedIdentify = GetLocalCode(MachineId)
+        Return CachedIdentify
     End Function
 
 #End Region
