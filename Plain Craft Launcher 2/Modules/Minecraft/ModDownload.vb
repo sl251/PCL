@@ -1177,7 +1177,15 @@ Public Module ModDownload
                                  Optional Content As String = Nothing, Optional ContentType As String = Nothing) As JToken
         Dim Urls As New List(Of (Url As String, Timeout As Integer))
         Dim McimUrl As String = DlSourceModGet(Url)
-        If McimUrl <> Url Then
+        Dim IsCurseForgeWithoutKey As Boolean = New Uri(Url).Host.Equals("api.curseforge.com", StringComparison.OrdinalIgnoreCase) AndAlso
+            String.IsNullOrWhiteSpace(CurseForgeAPIKey)
+        If IsCurseForgeWithoutKey Then
+            '未配置 Key 时，官方 API 必然拒绝访问；仅尝试已有的镜像源。
+            If McimUrl <> Url Then
+                Urls.Add((McimUrl, 10))
+                Urls.Add((McimUrl, 30))
+            End If
+        ElseIf McimUrl <> Url Then
             Select Case Settings.Get(Of Integer)("ToolDownloadMod")
                 Case 0
                     Urls.Add((McimUrl, 10))
@@ -1205,6 +1213,10 @@ Public Module ModDownload
                 Errors.Add(ex)
             End Try
         Next
+        If IsCurseForgeWithoutKey Then
+            Throw New AggregateException("CurseForge 镜像暂不可用，且此启动器未配置官方 API Key。" & vbCrLf &
+                "可以改用 Modrinth，或从 CurseForge 网站手动下载后导入。", Errors)
+        End If
         Throw New AggregateException(Errors)
     End Function
 

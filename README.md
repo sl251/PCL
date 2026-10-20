@@ -12,6 +12,7 @@
 <br/>
 
 ### 相关资源
+- [本分支的登录与 Mod 下载配置](docs/api-configuration.md)：API 配置入口，以及没有 CurseForge Key 时的功能范围
 - [PCL 下载](https://meloong.com/pcl)：下载可免费使用的正式版 PCL！
 - [PCL 功能投票](https://github.com/Meloong-Git/PCL/discussions/2)：来参加投票吧，开发者会优先处理票数较高的项目！
 - [帮助文档库](https://github.com/LTCatt/PCL2Help)：PCL 内置帮助文档的存储库

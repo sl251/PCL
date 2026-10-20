@@ -34,7 +34,8 @@ Friend Module ModSecret
             End If
         End If
         If Not SimulateBrowserHeaders Then Req.Headers.Add("Referer", $"http://{VersionCode}.open.pcl2.server/")
-        If Url.Contains("api.curseforge.com") OrElse Url.Contains("forgecdn.net") Then Req.Headers.Add("x-api-key", CurseForgeAPIKey)
+        If New Uri(Url).Host.Equals("api.curseforge.com", StringComparison.OrdinalIgnoreCase) AndAlso
+            Not String.IsNullOrWhiteSpace(CurseForgeAPIKey) Then Req.Headers.Add("x-api-key", CurseForgeAPIKey)
     End Sub
 
 #End Region

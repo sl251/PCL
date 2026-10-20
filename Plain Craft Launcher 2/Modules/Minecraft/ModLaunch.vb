@@ -1027,6 +1027,11 @@ Retry:
                 Throw New Exception("$登录尝试太过频繁，请等待几分钟后再试！")
             ElseIf ex.StatusCode = HttpStatusCode.Forbidden Then
                 Logger.Warn(ex, "微软登录第 4 步汇报 403")
+                If ex.Response?.IndexOf("Invalid app registration", StringComparison.OrdinalIgnoreCase) >= 0 Then
+                    Throw New Exception("$此启动器的登录应用未获 Minecraft 服务授权。" & vbCrLf &
+                        "请确认配置的 Client ID 已获准访问 Minecraft Java 服务，并且允许用于此启动器。" & vbCrLf &
+                        "更换网络节点无法解决此应用注册错误。", ex)
+                End If
                 Throw New Exception("$当前 IP 的登录尝试异常。" & vbCrLf & "如果你使用了 VPN 或加速器，请把它们关掉或更换节点后再试！")
             ElseIf ex.StatusCode = HttpStatusCode.ServiceUnavailable Then
                 Logger.Warn(ex, "微软登录第 4 步汇报 503")
